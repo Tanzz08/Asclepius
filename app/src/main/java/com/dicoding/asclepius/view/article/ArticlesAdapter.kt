@@ -17,7 +17,6 @@ import java.util.TimeZone
 class ArticlesAdapter : ListAdapter<ArticlesItem, ArticlesAdapter.MyViewHolder>(DIFF_CALLBACK) {
     class MyViewHolder(private val binding: ItemArticlesBinding) : RecyclerView.ViewHolder(binding.root) {
         fun bind(article : ArticlesItem){
-//            binding.tvName.text = article.source.name
             binding.tvTitle.text = article.title
             binding.tvAuthor.text = article.author
 
