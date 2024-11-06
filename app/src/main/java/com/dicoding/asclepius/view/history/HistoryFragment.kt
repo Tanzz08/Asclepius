@@ -7,10 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.viewModels
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.dicoding.asclepius.R
-import com.dicoding.asclepius.data.database.room.HistoryEntity
 import com.dicoding.asclepius.databinding.FragmentHistoryBinding
-import com.dicoding.asclepius.view.article.ArticlesAdapter
 import com.dicoding.asclepius.viewmodel.MainViewModel
 import com.dicoding.asclepius.viewmodel.ViewModelFactory
 
@@ -34,7 +31,13 @@ class HistoryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        adapter = HistoryAdapter()
+        adapter = HistoryAdapter{
+            val factory: ViewModelFactory = ViewModelFactory.getInstance(requireActivity().application)
+            val viewModel: MainViewModel by viewModels {
+                factory
+            }
+            viewModel.delete(it)
+        }
         binding.rvHistory.layoutManager = LinearLayoutManager(requireContext())
         binding.rvHistory.adapter = adapter
 
