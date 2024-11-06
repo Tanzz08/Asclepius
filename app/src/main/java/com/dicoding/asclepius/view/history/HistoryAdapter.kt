@@ -4,16 +4,14 @@ import android.annotation.SuppressLint
 import android.net.Uri
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContentProviderCompat.requireContext
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.dicoding.asclepius.data.database.room.HistoryEntity
-import com.dicoding.asclepius.databinding.ItemArticlesBinding
-import com.dicoding.asclepius.view.article.ArticlesAdapter.MyViewHolder
+import com.dicoding.asclepius.databinding.ItemHistoryBinding
+import java.text.NumberFormat
 
-class HistoryAdapter: RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder>() {
+class HistoryAdapter(private val onDeleteClick: (HistoryEntity) -> Unit): RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder>() {
     private val historyList = mutableListOf<HistoryEntity>()
 
     @SuppressLint("NotifyDataSetChanged")
@@ -23,19 +21,17 @@ class HistoryAdapter: RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder>() {
         notifyDataSetChanged()
     }
 
-    class HistoryViewHolder(private val binding: ItemArticlesBinding) : RecyclerView.ViewHolder(binding.root) {
+    class HistoryViewHolder(val binding: ItemHistoryBinding) : RecyclerView.ViewHolder(binding.root) {
         @SuppressLint("SetTextI18n")
         fun bind(history: HistoryEntity){
             // Bind data ke view
             binding.tvTitle.text = history.label
-            binding.tvAuthor.text = "Score: ${history.score}"
+            binding.tvAuthor.text = "Confidence Score: ${NumberFormat.getPercentInstance().format(history.score)}"
 
-            // mendapatkan inputStream dari URI
-            val imageUri = Uri.parse(history.imageUri)
+            val imageUri = Uri.parse(history.imageUri)// parse URI untuk mendapatkan gambar
             try {
-                val inputStream = itemView.context.contentResolver.openInputStream(imageUri)
                 Glide.with(binding.imgItemPhoto.context)
-                    .load(inputStream)
+                    .load(imageUri)
                     .into(binding.imgItemPhoto)
             }catch (e: SecurityException){
                 Log.e("Image Load Error", "Tidak memiliki izin untuk mengakses URI: ${history.imageUri}", e)
@@ -45,7 +41,7 @@ class HistoryAdapter: RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder>() {
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): HistoryViewHolder {
-        val binding = ItemArticlesBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        val binding = ItemHistoryBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return HistoryViewHolder(binding)
     }
 
@@ -53,5 +49,10 @@ class HistoryAdapter: RecyclerView.Adapter<HistoryAdapter.HistoryViewHolder>() {
 
     override fun onBindViewHolder(holder: HistoryViewHolder, position: Int) {
         holder.bind(historyList[position])
+
+        val ivDelete = holder.binding.btnDelete
+        ivDelete.setOnClickListener {
+            onDeleteClick(historyList[position])
+        }
     }
 }
