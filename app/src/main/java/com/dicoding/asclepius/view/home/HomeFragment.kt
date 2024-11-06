@@ -1,5 +1,6 @@
 package com.dicoding.asclepius.view.home
 
+import android.app.Activity.RESULT_OK
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -12,7 +13,6 @@ import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.ViewModelProvider
 import com.dicoding.asclepius.R
 import com.dicoding.asclepius.data.database.room.HistoryEntity
 import com.dicoding.asclepius.databinding.FragmentHomeBinding
@@ -20,7 +20,9 @@ import com.dicoding.asclepius.helper.ImageClassifierHelper
 import com.dicoding.asclepius.view.ResultActivity
 import com.dicoding.asclepius.viewmodel.MainViewModel
 import com.dicoding.asclepius.viewmodel.ViewModelFactory
+import com.yalantis.ucrop.UCrop
 import org.tensorflow.lite.task.vision.classifier.Classifications
+import java.io.File
 import java.text.NumberFormat
 
 
@@ -32,6 +34,7 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     private var currentImageUri: Uri? = null
+    private var croppedImageUri: Uri? = null
 
     private lateinit var imageClassifierHelper: ImageClassifierHelper
 
@@ -43,10 +46,6 @@ class HomeFragment : Fragment() {
         // Inflate the layout for this fragment
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding.root
-
-
-
-
         return root
     }
 
@@ -61,15 +60,8 @@ class HomeFragment : Fragment() {
         // setclicklistener button
         binding.galleryButton.setOnClickListener { startGallery() }
         binding.analyzeButton.setOnClickListener {
-            binding.progressIndicator.visibility = View.VISIBLE
+
             analyzeImage()
-
-            // ambil data setelah analisis
-//            val data = HistoryEntity(
-//                result =
-//            )
-
-
         }
 
         // insialisasi classifierHelper
@@ -104,8 +96,6 @@ class HomeFragment : Fragment() {
 
                                 // insert data ke database
                                 viewModel.insert(historyData)
-
-
                                 moveToResult(displayResult)
                             }else {
                                 showToast("Tidak dapat menemukan Hasil")
@@ -119,6 +109,21 @@ class HomeFragment : Fragment() {
 
     }
 
+    // mendapatkan hasil uCrop
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK && requestCode == UCrop.REQUEST_CROP) {
+            croppedImageUri = UCrop.getOutput(data!!)
+            showImage()
+            binding.analyzeButton.isEnabled = true
+        } else if (resultCode == UCrop.RESULT_ERROR) {
+            val cropError = UCrop.getError(data!!)
+            cropError?.let { Log.e("UCrop Error", it.message.toString()) }
+        }
+    }
+
     private fun startGallery() {
         launcherGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
@@ -128,7 +133,7 @@ class HomeFragment : Fragment() {
     ) { uri: Uri? ->
         if (uri != null) {
             currentImageUri = uri
-            showImage()
+            startCrop(uri)
             binding.analyzeButton.isEnabled = true
         } else {
 //            showToast(getString(R.string.empty_image_warning))
@@ -136,8 +141,18 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // fungsi untuk memulai uCrop
+    private fun startCrop(uri: Uri){
+        val destinationUri = Uri.fromFile(File(requireContext().cacheDir, "cropped_image.jpg"))
+        UCrop.of(uri, destinationUri)
+            .withAspectRatio(1f, 1f)
+            .withMaxResultSize(1080, 1080)
+            .start(requireContext(), this)
+    }
+
+
     private fun showImage() {
-        currentImageUri?.let {
+        croppedImageUri?.let {
             Log.d("Image URI", "showImage: $it")
             binding.previewImageView.setImageURI(it)
         }
@@ -156,7 +171,7 @@ class HomeFragment : Fragment() {
 
     private fun moveToResult(result: String) {
         val intent = Intent(requireActivity(), ResultActivity::class.java)
-        intent.putExtra(ResultActivity.EXTRA_IMAGE_URI, currentImageUri.toString())
+        intent.putExtra(ResultActivity.EXTRA_IMAGE_URI, croppedImageUri.toString())
         intent.putExtra(ResultActivity.EXTRA_RESULT, result)
         startActivity(intent)
     }
