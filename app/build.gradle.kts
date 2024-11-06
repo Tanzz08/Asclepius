@@ -70,10 +70,14 @@ dependencies {
     // glide
     implementation ("com.github.bumptech.glide:glide:4.16.0")
 
+    // library Room dan pendukungnya
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.7")
     implementation("androidx.room:room-runtime:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+
+    // uCrop
+    implementation("com.github.yalantis:ucrop:2.2.8")
 
 
 
