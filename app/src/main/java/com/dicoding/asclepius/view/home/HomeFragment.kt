@@ -1,5 +1,6 @@
 package com.dicoding.asclepius.view.home
 
+import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK
 import android.content.Intent
 import android.net.Uri
@@ -12,7 +13,7 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.fragment.app.viewModels
+import androidx.lifecycle.ViewModelProvider
 import com.dicoding.asclepius.R
 import com.dicoding.asclepius.data.database.room.HistoryEntity
 import com.dicoding.asclepius.databinding.FragmentHomeBinding
@@ -33,10 +34,10 @@ class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    private var currentImageUri: Uri? = null
-    private var croppedImageUri: Uri? = null
-
     private lateinit var imageClassifierHelper: ImageClassifierHelper
+
+    private lateinit var viewModel: MainViewModel
+
 
 
     override fun onCreateView(
@@ -44,6 +45,10 @@ class HomeFragment : Fragment() {
         savedInstanceState: Bundle?,
     ): View {
         // Inflate the layout for this fragment
+
+        val factory = ViewModelFactory.getInstance(requireActivity().application)
+        viewModel = ViewModelProvider(this, factory).get(MainViewModel::class.java)
+
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding.root
         return root
@@ -52,9 +57,8 @@ class HomeFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val factory: ViewModelFactory = ViewModelFactory.getInstance(requireActivity().application)
-        val viewModel: MainViewModel by viewModels {
-            factory
+        viewModel.croppedImageUri?.let {
+            binding.previewImageView.setImageURI(it)
         }
 
         // setclicklistener button
@@ -82,16 +86,15 @@ class HomeFragment : Fragment() {
                             if (it.isNotEmpty() && it[0].categories.isNotEmpty()){
                                 Log.d("Classification Result", it.toString())
 
-                                val sortedCategories = it[0].categories.sortedByDescending { it.score }
+                                val label = it[0].categories[0].label
+                                val score = NumberFormat.getPercentInstance().format(it[0].categories[0].score).trim()
                                 val topCategory = it[0].categories[0]
-                                val displayResult = sortedCategories.joinToString("\n") { category ->
-                                    "${category.label}: ${NumberFormat.getPercentInstance().format(category.score)}"
-                                }
+                                val displayResult = "$label : $score"
 
                                 val historyData = HistoryEntity(
                                     label = topCategory.label,
                                     score = topCategory.score,
-                                    imageUri = currentImageUri.toString()
+                                    imageUri = viewModel.currentImageUri.toString()
                                 )
 
                                 // insert data ke database
@@ -115,12 +118,16 @@ class HomeFragment : Fragment() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK && requestCode == UCrop.REQUEST_CROP) {
-            croppedImageUri = UCrop.getOutput(data!!)
+            viewModel.croppedImageUri = UCrop.getOutput(data!!)
             showImage()
             binding.analyzeButton.isEnabled = true
         } else if (resultCode == UCrop.RESULT_ERROR) {
             val cropError = UCrop.getError(data!!)
             cropError?.let { Log.e("UCrop Error", it.message.toString()) }
+        } else if (resultCode == RESULT_CANCELED && requestCode == UCrop.REQUEST_CROP) {
+            // Menangani kasus cancel: reset URI dan nonaktifkan tombol analyze
+            viewModel.croppedImageUri = null
+            binding.analyzeButton.isEnabled = false
         }
     }
 
@@ -132,9 +139,8 @@ class HomeFragment : Fragment() {
         ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
-            currentImageUri = uri
+            viewModel.currentImageUri = uri
             startCrop(uri)
-            binding.analyzeButton.isEnabled = true
         } else {
 //            showToast(getString(R.string.empty_image_warning))
             Log.d("Photo Picker", "No media selected")
@@ -152,8 +158,9 @@ class HomeFragment : Fragment() {
 
 
     private fun showImage() {
-        croppedImageUri?.let {
+        viewModel.croppedImageUri?.let {
             Log.d("Image URI", "showImage: $it")
+            binding.previewImageView.setImageURI(null)
             binding.previewImageView.setImageURI(it)
         }
     }
@@ -163,7 +170,7 @@ class HomeFragment : Fragment() {
         binding.progressIndicator.visibility = View.VISIBLE
 
         // memastikan gambar telah dipilih sebelum klasifikasi
-        currentImageUri?.let { uri ->
+        viewModel.currentImageUri?.let { uri ->
 
             imageClassifierHelper.classifyStaticImage(uri)
         } ?: showToast(getString(R.string.empty_image_warning))
@@ -171,7 +178,7 @@ class HomeFragment : Fragment() {
 
     private fun moveToResult(result: String) {
         val intent = Intent(requireActivity(), ResultActivity::class.java)
-        intent.putExtra(ResultActivity.EXTRA_IMAGE_URI, croppedImageUri.toString())
+        intent.putExtra(ResultActivity.EXTRA_IMAGE_URI, viewModel.croppedImageUri.toString())
         intent.putExtra(ResultActivity.EXTRA_RESULT, result)
         startActivity(intent)
     }
